@@ -1,16 +1,16 @@
 #
-# Title: LAHD Affordable Housing Shiny App
+# Title: LAHD Affordable Housing Projects Shiny App
 #
 # Description: This Shiny web application allows users to explore LAHD Affordable 
 # Housing Projects dataset. The LAHD Affordable Housing dataset contains 
 # information on the affordable housing projects financed by the Los Angeles 
 # Housing Department (LAHD) from 2003 to the present. The dataset features, among 
 # other variables, the costs, dates, site locations, number of units, housing 
-# types, and development status for each project
+# types, and development status for each project.
 #
 # Source of data: https://data.lacity.org/
 # 
-# Auother of Shiny app: Joshua Roche
+# Author of Shiny app: Joshua Roche
 #
 
 # Libraries
@@ -92,6 +92,7 @@ lahd_projects_df <- lahd_housing_df %>%
 # Initialize the starting data frame
 startData <- lahd_projects_df %>% 
   select(-c("PROJECT_NUMBER", "IN_SERVICE_DATE")) %>%
+  #select(-c("IN_SERVICE_DATE")) %>%
   na.omit()
 
 
@@ -121,15 +122,15 @@ ui <- fluidPage(
       ),
       # Show a plot of the generated distribution
       mainPanel(
-        h4("Table: Distribution of Characteristic"),
+        h4("Table: Distribution of Project Characteristic"),
         dataTableOutput("distTable"),
-        h4("Bar Chart: Distribution of Characteristic"),
+        h4("Bar Chart: Distribution of Project Characteristic"),
         plotOutput("distPlot")
       )
     )
   ),
   
-  h3("Box Plots of Affordable Housing Project Characteristics"),
+  h3("Box Plots of Affordable Housing Project Metrics"),
   
   fluidRow(
     
@@ -195,10 +196,10 @@ ui <- fluidPage(
       
       # Show a plot of the generated distribution
       mainPanel(
-        h4("Line Chart: Time Series by Date of Funding"),
+        h4("Line Chart: Time Series by Year of Funding"),
         plotOutput("linePlot"),
         h4("Column Chart: Time Series by Year of Funding"),
-        plotOutput("groupedLinePlot"),
+        plotOutput("groupedColPlot"),
         h4("Table: Time Series by Year of Funding"),
         dataTableOutput("distYearTable")
       )
@@ -216,17 +217,6 @@ server <- function(input, output) {
       group_by(!!as.name(input$GB)) %>% 
       summarise_if(is.numeric, sum, na.rm = TRUE) %>%
       mutate(COST_PER_HOUSING_UNIT = TOTAL_DEVELOPMENT_COST / PROJECT_TOTAL_UNITS)
-  )
-  
-  dateTimeData <- reactive(
-    if(input$housingType == "ALL") {
-      startData %>% 
-        filter(DATE_FUNDED >= input$dateRange[1] & DATE_FUNDED <= input$dateRange[2])
-    } else {
-      startData %>% 
-        filter(DATE_FUNDED >= input$dateRange[1] & DATE_FUNDED <= input$dateRange[2] 
-               & HOUSING_TYPE == input$housingType)
-    }
   )
   
   timeData <- reactive(
@@ -279,6 +269,8 @@ server <- function(input, output) {
       geom_bar(stat = "identity", width = 1) +
       coord_polar("y", start = 0) +
       labs(x = NULL, y = NULL, fill = NULL) +
+      ggtitle(paste("Total of ", str_replace_all(input$Metric, "_", " "), 
+                    " by ", str_replace_all(input$GB, "_", " "))) +
       theme_classic() +
       theme(axis.line = element_blank(),
             axis.text = element_blank(),
@@ -318,15 +310,15 @@ server <- function(input, output) {
   })
   
   output$linePlot <- renderPlot({
-    dateTimeData() %>%
-      ggplot(aes(x = DATE_FUNDED, y = !!as.name(input$HPM), 
+    timeData() %>%
+      ggplot(aes(x = as.numeric(YEAR_FUNDED), y = !!as.name(input$HPM), 
                  color = !!as.name(input$HPC2))) +
       geom_point(size = 3) +
       geom_line(linewidth = 1.5) +
-      scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
-      labs(x = "DATE FUNDED", y = str_replace_all(input$HPM, "_", " "),
+      scale_x_continuous(breaks = seq(2003, 2023, 1)) +
+      labs(x = "YEAR FUNDED", y = str_replace_all(input$HPM, "_", " "),
            color = str_replace_all(input$HPC2, "_", " ")) +
-      ggtitle(paste(str_replace_all(input$HPM, "_", " "), " by ", 
+      ggtitle(paste("Total ", str_replace_all(input$HPM, "_", " "), " by ", 
                     str_replace_all(input$HPC2, "_", " "), " for ", 
                     str_replace_all(input$housingType, "_", " "),
                     " HOUSING from ", input$dateRange[1], 
@@ -336,7 +328,7 @@ server <- function(input, output) {
             plot.title = element_text(size = 16, face = "bold"))
   })
   
-  output$groupedLinePlot <- renderPlot({
+  output$groupedColPlot <- renderPlot({
     timeData() %>%
       ggplot(aes(x = as.numeric(YEAR_FUNDED), y = !!as.name(input$HPM), 
                  fill = !!as.name(input$HPC2))) +
